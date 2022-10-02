@@ -1,19 +1,19 @@
 use rand::{thread_rng, seq::SliceRandom, Rng};
 use bevy::prelude::*;
 
-use crate::{ai_logic::{NeuralNetwork, AI}, target::Target, AI_SPRITE_SCALE, RADII, NUM_AI, LEARN_RATE};
+use crate::{ai_logic::AI, targets::Target, AI_SPRITE_SCALE, SPAWN_RADII, NUM_AI, LEARN_RATE};
 
 
 
 pub struct Pool{
-    ai: Vec<NeuralNetwork>,
+    ai: Vec<AI>,
 }
 
 impl Pool{
     pub fn new(population: u32) -> Self{
         let mut ai = Vec::new();
         for _ in 0..population{
-            ai.push(NeuralNetwork::default());
+            ai.push(AI::new());
         }
 
         Self{
@@ -21,7 +21,7 @@ impl Pool{
         }
     }
 
-    pub fn update_pool(&mut self, good_ai: Vec<NeuralNetwork>){
+    pub fn update_pool(&mut self, good_ai: Vec<AI>){
         // randomly select genes to replace
         self.ai.shuffle(&mut thread_rng());
         self.ai.truncate(self.ai.len() - good_ai.len());
@@ -32,7 +32,7 @@ impl Pool{
         for i in 0..self.ai.len(){
             // get the log of i
             // let log = (i as f32).log2();
-            self.ai[i].mutate(LEARN_RATE);
+            self.ai[i].brain.mutate(LEARN_RATE);
         }
 
     }
@@ -41,7 +41,7 @@ impl Pool{
         &mut self,
         ai_query: &Query<(Entity,&Transform, &AI)>,
         target_query: &Query<&Target>,
-    ) -> Vec<NeuralNetwork> {
+    ) -> Vec<AI> {
         let mut ai_pool = Vec::new();
 
         for (_, transform, ai) in ai_query.iter() {
@@ -52,7 +52,7 @@ impl Pool{
             });
 
             if in_target {
-                ai_pool.push(ai.brain.clone());
+                ai_pool.push(ai.clone());
             }
         }
 
@@ -61,10 +61,9 @@ impl Pool{
 
     fn create_new_ai(&self) -> AI{
         let mut rng = thread_rng();
-        let gene = self.ai.choose(&mut rng).unwrap();
-        AI{
-            brain: gene.clone(),
-        }
+        let ai = self.ai.choose(&mut rng).unwrap();
+
+        ai.clone()
     }
 
     pub fn spawn_ai(&self, commands: &mut Commands) {
@@ -89,8 +88,8 @@ impl Pool{
     
         let mut rng = rand::thread_rng();
         for _ in 0..NUM_AI {
-            let x = rng.gen_range(-RADII..RADII);
-            let y = rng.gen_range(-RADII..RADII);
+            let x = rng.gen_range(-SPAWN_RADII..SPAWN_RADII);
+            let y = rng.gen_range(-SPAWN_RADII..SPAWN_RADII);
             spawn(x, y);
         }
     }

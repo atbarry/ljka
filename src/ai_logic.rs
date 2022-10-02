@@ -3,12 +3,7 @@ use ndarray::{Array2, Array1};
 use ndarray_rand::{RandomExt, rand_distr::Uniform};
 use rand::{thread_rng, Rng};
 
-use crate::MOVE_SPEED;
-
-#[derive(Component)]
-pub struct AI {
-    pub brain: NeuralNetwork,
-}
+use crate::{MOVE_SPEED, NETWORK_LAYERS};
 
 pub fn move_ai(query: &mut Query<(&mut Transform, &AI)>) {
     // move in a random direction for now
@@ -18,6 +13,22 @@ pub fn move_ai(query: &mut Query<(&mut Transform, &AI)>) {
         let x = (output[0] * 2.  - 1.0) * MOVE_SPEED;
         let y = (output[1] * 2.  - 1.0) * MOVE_SPEED;
         transform.translation += Vec3::new(x, y, 0.0);
+    }
+}
+
+#[derive(Component, Clone)]
+pub struct AI {
+    pub brain: NeuralNetwork,
+}
+
+impl AI {
+    pub fn new() -> Self {
+        let mut rng = thread_rng();
+        let mut brain = NeuralNetwork::new(2, NETWORK_LAYERS.to_vec());
+
+        Self {
+            brain,
+        }
     }
 }
 

@@ -1,3 +1,5 @@
+#[allow(unused)]
+
 use bevy::{
     prelude::{App, ClearColor, Color},
     DefaultPlugins, diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin},

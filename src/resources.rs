@@ -1,6 +1,5 @@
 use bevy::prelude::*;
 use plotters::{prelude::*, style::Color};
-use rand::{thread_rng, seq::SliceRandom};
 
 pub struct SimState {
     gen_is_complete: bool,

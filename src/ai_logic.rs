@@ -1,19 +1,16 @@
 use bevy::prelude::*;
 use ndarray::{Array2, Array1};
 use ndarray_rand::{RandomExt, rand_distr::Uniform};
-use rand::{seq::SliceRandom, thread_rng, Rng};
+use rand::{thread_rng, Rng};
 
-use crate::target::Target;
-
-const LEARN_RATE : f32 = 10.0;
-const MOVE_SPEED : f32 = 4.0;
+use crate::MOVE_SPEED;
 
 #[derive(Component)]
-pub struct Ai {
-    brain: NeuralNetwork,
+pub struct AI {
+    pub brain: NeuralNetwork,
 }
 
-pub fn move_ai(query: &mut Query<(&mut Transform, &Ai)>) {
+pub fn move_ai(query: &mut Query<(&mut Transform, &AI)>) {
     // move in a random direction for now
     for (mut transform, ai) in query.iter_mut() {
         let input = Array1::from(vec![transform.translation.x, transform.translation.y]);
@@ -22,71 +19,6 @@ pub fn move_ai(query: &mut Query<(&mut Transform, &Ai)>) {
         let y = (output[1] * 2.  - 1.0) * MOVE_SPEED;
         transform.translation += Vec3::new(x, y, 0.0);
     }
-}
-
-pub struct GenePool{
-    genes: Vec<NeuralNetwork>,
-}
-
-impl GenePool{
-    pub fn new(population: u32) -> Self{
-        let mut genes = Vec::new();
-        for _ in 0..population{
-            genes.push(NeuralNetwork::default());
-        }
-
-        Self{
-            genes,
-        }
-    }
-
-    pub fn add_genes(&mut self, successful_genes: Vec<NeuralNetwork>){
-        // randomly select genes to replace
-        self.genes.shuffle(&mut thread_rng());
-        self.genes.truncate(self.genes.len() - successful_genes.len());
-
-        self.genes.extend(successful_genes);
-
-        // randomly mutate genes
-        for i in 0..self.genes.len(){
-            // get the log of i
-            // let log = (i as f32).log2();
-            self.genes[i].mutate(LEARN_RATE);
-        }
-
-    }
-
-    pub fn get_successful_ai(
-        &mut self,
-        ai_query: &Query<(Entity,&Transform, &Ai)>,
-        target_query: &Query<&Target>,
-    ) -> Vec<NeuralNetwork> {
-        let mut genes = Vec::new();
-        let mut success_num = 0;
-
-        for (_, transform, ai) in ai_query.iter() {
-            for target in target_query.iter() {
-                let pos = transform.translation;
-
-                // if the ai is in the target, add the gene to the pool
-                if target.is_in_target(Vec2::new(pos.x, pos.y)) {
-                    genes.push(ai.brain.clone());
-                    success_num += 1;
-                }
-            }
-        }
-
-        genes
-    }
-
-    pub fn create_new_ai(&self) -> Ai{
-        let mut rng = thread_rng();
-        let gene = self.genes.choose(&mut rng).unwrap();
-        Ai{
-            brain: gene.clone(),
-        }
-    }
-
 }
 
 #[derive(Debug, Clone)]
@@ -137,7 +69,7 @@ impl NeuralNetwork {
     }
 
     // create a function that mutates the weights and biases slightly
-    fn mutate(&self, learn_rate: f32) -> Self {
+    pub fn mutate(&self, learn_rate: f32) -> Self {
         let rng = &mut thread_rng();
         let mut apply_mutation = |x: f32| -> f32 {
             (x + rng.gen_range(-1.0..1.0)) * learn_rate
@@ -162,13 +94,12 @@ fn sigmoid(x: f32) -> f32 {
 
 fn create_biases(size: usize) -> Array1<f32> {
     // create a vector of random values between -1 and 1
-    let mut biases = Array1::random(size, Uniform::new(-1.0, 1.0));
-    
+    let biases = Array1::random(size, Uniform::new(-1.0, 1.0));
     biases
 }
 
 fn create_weights(input_nodes: usize, output_nodes: usize) -> Array2<f32> {
     // create a matrix of random values between -1 and 1
-    let mut weights = Array2::random((output_nodes, input_nodes), Uniform::new(-1.0, 1.0));
+    let weights = Array2::random((output_nodes, input_nodes), Uniform::new(-1.0, 1.0));
     weights
 }

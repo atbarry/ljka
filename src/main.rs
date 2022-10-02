@@ -1,6 +1,6 @@
 use bevy::{
     prelude::{App, ClearColor, Color},
-    DefaultPlugins,
+    DefaultPlugins, diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin},
 };
 use bevy_inspector_egui::WorldInspectorPlugin;
 use ljka::GamePlugin;
@@ -10,6 +10,8 @@ fn main() {
         .insert_resource(ClearColor(Color::GRAY))
         .add_plugins(DefaultPlugins)
         .add_plugin(WorldInspectorPlugin::new())
+        // .add_plugin(LogDiagnosticsPlugin::default())
+        // .add_plugin(FrameTimeDiagnosticsPlugin::default())
         .add_plugin(GamePlugin)
         .run();
 }

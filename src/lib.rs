@@ -2,14 +2,14 @@ use ai_logic::Ai;
 use bevy::{prelude::*, render::camera::ScalingMode};
 use rand::Rng;
 use ai_logic::GenePool;
-use resources::{StepController, Generation};
+use resources::{StepController, SimState};
 
 mod ai_logic;
 mod target;
 mod resources;
 mod controls;
 
-const NUM_AI: u32 = 1000;
+const NUM_AI: u32 = 5000;
 const RADII: f32 = 50.0;
 const AI_SPRITE_SCALE: f32 = 1.0;
 
@@ -18,7 +18,7 @@ pub struct GamePlugin;
 impl Plugin for GamePlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(StepController::new(50., 100))
-            .insert_resource(Generation::new())
+            .insert_resource(SimState::new())
             .insert_resource(GenePool::new(NUM_AI))
             .add_startup_system(spawn_camera)
             .add_startup_system(first_generation)
@@ -26,14 +26,13 @@ impl Plugin for GamePlugin {
             .add_plugin(controls::ControlPlugin)
             .add_system(next_generation.before(run_steps))
             .add_system(run_steps);
-
     }
 }
 
 fn run_steps(
     mut query: Query<(&mut Transform, &Ai)>,
     mut step_controller: ResMut<StepController>,
-    mut gen: ResMut<Generation>,
+    mut gen: ResMut<SimState>,
     time: Res<Time>,
 ) {
     let steps = step_controller.steps_next_frame(&time);
@@ -45,19 +44,11 @@ fn run_steps(
             break;
         }
 
-        move_ai(&mut query);
+        ai_logic::move_ai(&mut query);
     }
 }
 
-pub fn move_ai(query: &mut Query<(&mut Transform, &Ai)>) {
-    // move in a random direction for now
-    for (mut transform, _) in query.iter_mut() {
-        let mut rng = rand::thread_rng();
-        let x = rng.gen_range(-1.0..1.0);
-        let y = rng.gen_range(-1.0..1.0);
-        transform.translation += Vec3::new(1.0, y, 0.0);
-    }
-}
+
 
 fn first_generation(mut commands: Commands, pool: Res<GenePool>) {
     spawn_ai(&mut commands, &pool);
@@ -65,16 +56,21 @@ fn first_generation(mut commands: Commands, pool: Res<GenePool>) {
 
 fn next_generation(
     mut commands: Commands,
-    mut gen: ResMut<Generation>,
+    mut gen: ResMut<SimState>,
     mut pool: ResMut<GenePool>,
     target_query: Query<&target::Target>,
     ai_query: Query<(Entity, &Transform, &Ai)>,
 ) {
-    if !gen.is_complete() {
+    if !gen.gen_is_complete() {
         return;
     }
 
-    pool.add_successful_ai(&ai_query, &target_query);
+    let genes = pool.get_successful_ai(&ai_query, &target_query);
+    
+    gen.save_successful(genes.len() as u32);
+    gen.save_plots();
+
+    pool.add_genes(genes);
 
     // Remove all ai
     for (entity, _, _) in ai_query.iter() {
@@ -82,7 +78,7 @@ fn next_generation(
     }
 
     spawn_ai(&mut commands, &pool);
-    gen.created();
+    gen.created_next_gen();
 }
 
 fn spawn_ai(

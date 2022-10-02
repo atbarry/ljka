@@ -5,18 +5,27 @@ use rand::{seq::SliceRandom, thread_rng, Rng};
 
 use crate::target::Target;
 
+const LEARN_RATE : f32 = 10.0;
+const MOVE_SPEED : f32 = 4.0;
+
 #[derive(Component)]
 pub struct Ai {
     brain: NeuralNetwork,
 }
 
-impl Ai{
-    
+pub fn move_ai(query: &mut Query<(&mut Transform, &Ai)>) {
+    // move in a random direction for now
+    for (mut transform, ai) in query.iter_mut() {
+        let input = Array1::from(vec![transform.translation.x, transform.translation.y]);
+        let output = ai.brain.feed_forward(input);
+        let x = (output[0] * 2.  - 1.0) * MOVE_SPEED;
+        let y = (output[1] * 2.  - 1.0) * MOVE_SPEED;
+        transform.translation += Vec3::new(x, y, 0.0);
+    }
 }
 
 pub struct GenePool{
     genes: Vec<NeuralNetwork>,
-    population: u32,
 }
 
 impl GenePool{
@@ -28,29 +37,30 @@ impl GenePool{
 
         Self{
             genes,
-            population,
         }
     }
 
-    fn add_genes(&mut self, genes: Vec<NeuralNetwork>){
+    pub fn add_genes(&mut self, successful_genes: Vec<NeuralNetwork>){
         // randomly select genes to replace
         self.genes.shuffle(&mut thread_rng());
-        self.genes.truncate(self.genes.len() - genes.len());
+        self.genes.truncate(self.genes.len() - successful_genes.len());
 
-        // Add new genes to the pool
-        self.genes.extend(genes);
+        self.genes.extend(successful_genes);
 
-        // Mutate the genes
-        for gene in self.genes.iter_mut(){
-            gene.mutate_layers();
+        // randomly mutate genes
+        for i in 0..self.genes.len(){
+            // get the log of i
+            // let log = (i as f32).log2();
+            self.genes[i].mutate(LEARN_RATE);
         }
+
     }
 
-    pub fn add_successful_ai(
+    pub fn get_successful_ai(
         &mut self,
         ai_query: &Query<(Entity,&Transform, &Ai)>,
         target_query: &Query<&Target>,
-    ) {
+    ) -> Vec<NeuralNetwork> {
         let mut genes = Vec::new();
         let mut success_num = 0;
 
@@ -66,8 +76,7 @@ impl GenePool{
             }
         }
 
-        println!("Success: {}", success_num);
-        self.add_genes(genes);
+        genes
     }
 
     pub fn create_new_ai(&self) -> Ai{
@@ -81,7 +90,7 @@ impl GenePool{
 }
 
 #[derive(Debug, Clone)]
-struct NeuralNetwork {
+pub struct NeuralNetwork {
     layers: Vec<Layer>,
 } 
 
@@ -93,7 +102,7 @@ struct Layer {
 
 impl NeuralNetwork {
     pub fn default() -> Self {
-        Self::new(2, vec![3, 3, 2])
+        Self::new(2, vec![2, 2])
     }
 
     fn new(num_inputs: usize, nodes_per_layer: Vec<usize>) -> Self {
@@ -128,13 +137,19 @@ impl NeuralNetwork {
     }
 
     // create a function that mutates the weights and biases slightly
-    fn mutate_layers(&self) -> Self {
+    fn mutate(&self, learn_rate: f32) -> Self {
+        let rng = &mut thread_rng();
+        let mut apply_mutation = |x: f32| -> f32 {
+            (x + rng.gen_range(-1.0..1.0)) * learn_rate
+        };
+
         let mut layers = Vec::new();
         for layer in &self.layers {
-            let weights = layer.weights.mapv(mutate);
-            let biases = layer.biases.mapv(mutate);
+            let weights = layer.weights.mapv(&mut apply_mutation);
+            let biases = layer.biases.mapv(&mut apply_mutation);
             layers.push(Layer{weights, biases});
         }
+
         Self {
             layers,
         }
@@ -143,10 +158,6 @@ impl NeuralNetwork {
 
 fn sigmoid(x: f32) -> f32 {
     1.0 / (1.0 + (-x).exp())
-}
-
-fn mutate(x: f32) -> f32 {
-    x + (rand::random::<f32>() - 0.5) * 0.05
 }
 
 fn create_biases(size: usize) -> Array1<f32> {

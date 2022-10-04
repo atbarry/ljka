@@ -30,6 +30,26 @@ impl AI {
             brain,
         }
     }
+
+    pub fn learn_reproduce(&self, learn_rate: f32) -> Self {
+            // create a function that mutates the weights and biases slightly
+
+        let rng = &mut thread_rng();
+        let mut apply_mutation = |x: f32| -> f32 {
+            x + (rand::random::<f32>() - 0.5) * 2.0 * learn_rate
+        };
+
+        let mut layers = Vec::new();
+        for layer in &self.brain.layers{
+            let weights = layer.weights.mapv(&mut apply_mutation);
+            let biases = layer.biases.mapv(&mut apply_mutation);
+            layers.push(Layer{weights, biases});
+        }
+
+        Self {
+            brain: NeuralNetwork{layers},
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -78,25 +98,6 @@ impl NeuralNetwork {
         }
         output
     }
-
-    // create a function that mutates the weights and biases slightly
-    pub fn mutate(&self, learn_rate: f32) -> Self {
-        let rng = &mut thread_rng();
-        let mut apply_mutation = |x: f32| -> f32 {
-            (x + rng.gen_range(-1.0..1.0)) * learn_rate
-        };
-
-        let mut layers = Vec::new();
-        for layer in &self.layers {
-            let weights = layer.weights.mapv(&mut apply_mutation);
-            let biases = layer.biases.mapv(&mut apply_mutation);
-            layers.push(Layer{weights, biases});
-        }
-
-        Self {
-            layers,
-        }
-    }
 }
 
 fn sigmoid(x: f32) -> f32 {
@@ -114,3 +115,4 @@ fn create_weights(input_nodes: usize, output_nodes: usize) -> Array2<f32> {
     let weights = Array2::random((output_nodes, input_nodes), Uniform::new(-1.0, 1.0));
     weights
 }
+

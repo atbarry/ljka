@@ -9,15 +9,15 @@ mod targets;
 mod resources;
 mod controls;
 
-const NUM_AI: u32 = 5000;
-const SPAWN_RADII: f32 = 50.0;
-const AI_SPRITE_SCALE: f32 = 1.0;
+const NUM_AI: u32 = 20000;
+const SPAWN_RADII: f32 = 75.0;
+const AI_SPRITE_SCALE: f32 = 0.75;
 
 const MOVE_SPEED : f32 = 4.0;
-const LEARN_RATE : f32 = 10.0;
-const NETWORK_LAYERS: [usize; 2] = [2, 2];
+const LEARN_RATE : f32 = 0.1;
+const NETWORK_LAYERS: [usize; 1] = [2];
 
-const SIM_SPEED : f32 = 1.0;
+const SIM_SPEED : f32 = 25.0;
 const SIM_GEN_LENGTH : u32 = 100;
 
 pub struct GamePlugin;
@@ -72,12 +72,12 @@ fn next_generation(
         return;
     }
 
-    let genes = pool.get_successful_ai(&ai_query, &target_query);
+    let (good, bad) = pool.judge_ai(&ai_query, &target_query);
     
-    gen.save_successful(genes.len() as u32);
+    gen.save_successful(good.len() as u32);
     gen.save_plots();
 
-    pool.update_pool(genes);
+    pool.update_pool(good, bad);
 
     // Remove all ai
     for (entity, _, _) in ai_query.iter() {

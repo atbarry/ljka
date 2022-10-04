@@ -14,10 +14,10 @@ fn speed_control(
     mut step_controller: ResMut<StepController>,
 ) {
     if keyboard_input.just_pressed(KeyCode::Up) {
-        step_controller.increase_speed();
+        step_controller.change_speed(1.25);
     }
     if keyboard_input.just_pressed(KeyCode::Down) {
-        step_controller.decrease_speed();
+        step_controller.change_speed(0.8);
     }
 }
 

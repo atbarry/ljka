@@ -12,9 +12,9 @@ fn spawn_target(
     mut commands: Commands,
 ) {
     // spawn a square off to the right
-    let x = 50.0;
+    let x = 40.0;
     let y = 0.0;
-    let radius = 10.0;
+    let radius = 4.0;
     let target = Target::new(Shape::Square, Vec2 { x, y }, radius);
 
     let sprite_bundle = target.create_sprite_bundle();

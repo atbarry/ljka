@@ -116,15 +116,11 @@ impl StepController {
     }
 
     
-    pub fn increase_speed(&mut self) {
-        self.steps_per_second *= 2.0;
+    pub fn change_speed(&mut self, multiple: f32) {
+        self.steps_per_second *= multiple;
         self.timer = StepTimer::new(1. / self.steps_per_second);
     }
 
-    pub fn decrease_speed(&mut self) {
-        self.steps_per_second *= 0.5;
-        self.timer = StepTimer::new(1. / self.steps_per_second);
-    }
 }
 
 

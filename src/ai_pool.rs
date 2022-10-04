@@ -21,28 +21,41 @@ impl Pool{
         }
     }
 
-    pub fn update_pool(&mut self, good_ai: Vec<AI>){
-        // randomly select genes to replace
-        self.ai.shuffle(&mut thread_rng());
-        self.ai.truncate(self.ai.len() - good_ai.len());
+    pub fn update_pool(&mut self, good_ai: Vec<AI>, bad_ai: Vec<AI>){
+        self.ai.clear();
 
-        self.ai.extend(good_ai);
 
-        // randomly mutate genes
-        for i in 0..self.ai.len(){
-            // get the log of i
-            // let log = (i as f32).log2();
-            self.ai[i].brain.mutate(LEARN_RATE);
+        let good_ai_to_spawn = num_good_ai_to_spawn(
+            good_ai.len() as u32,
+             0.5
+        );
+
+        let bad_ai_to_spawn = NUM_AI - good_ai_to_spawn;
+
+        dbg!(good_ai_to_spawn, bad_ai_to_spawn);
+
+        let mut rng = thread_rng();
+
+        for _ in 0..good_ai_to_spawn{
+            let mut new_ai = good_ai.choose(&mut rng).unwrap().clone();
+            self.ai.push(new_ai);
         }
 
+        for _ in 0..bad_ai_to_spawn{
+            let mut new_ai = bad_ai.choose(&mut rng).unwrap().learn_reproduce(LEARN_RATE);
+            self.ai.push(new_ai);
+        }
+
+        self.ai.shuffle(&mut rng);
     }
 
-    pub fn get_successful_ai(
+    pub fn judge_ai(
         &mut self,
         ai_query: &Query<(Entity,&Transform, &AI)>,
         target_query: &Query<&Target>,
-    ) -> Vec<AI> {
-        let mut ai_pool = Vec::new();
+    ) -> (Vec<AI>, Vec<AI>) {
+        let mut good_ai = Vec::new();
+        let mut bad_ai = Vec::new();
 
         for (_, transform, ai) in ai_query.iter() {
             let in_target = target_query.iter().any(|target| {
@@ -52,11 +65,13 @@ impl Pool{
             });
 
             if in_target {
-                ai_pool.push(ai.clone());
+                good_ai.push(ai.clone());
+            } else {
+                bad_ai.push(ai.clone());
             }
         }
 
-        ai_pool
+        (good_ai, bad_ai)
     }
 
     fn create_new_ai(&self) -> AI{
@@ -94,3 +109,21 @@ impl Pool{
         }
     }
 }
+
+fn num_good_ai_to_spawn(good_ai_num: u32, growth_rate: f32) -> u32 {
+    // let t = NUM_AI as f32;
+    // let g = good_ai_num as f32;
+    // (2.0 * t - (2.0 * t) / (1.0 + (g / t).powf(growth_rate))) as u32
+
+    if good_ai_num == 0{
+        0
+    } else if good_ai_num < 10 {
+        NUM_AI
+    }
+    else if good_ai_num < (NUM_AI as f32 / 2.2) as u32 {
+        NUM_AI / 2
+    } else {
+        NUM_AI
+    }
+}
+

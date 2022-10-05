@@ -15,7 +15,7 @@ const AI_SPRITE_SCALE: f32 = 0.75;
 
 const MOVE_SPEED : f32 = 4.0;
 const LEARN_RATE : f32 = 0.1;
-const NETWORK_LAYERS: [usize; 1] = [2];
+const NETWORK_LAYERS: [usize; 2] = [2, 2];
 
 const SIM_SPEED : f32 = 25.0;
 const SIM_GEN_LENGTH : u32 = 100;

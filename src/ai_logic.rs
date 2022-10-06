@@ -19,7 +19,7 @@ pub fn move_ai(query: &mut Query<(&mut Transform, &AI)>) {
 #[derive(Component, Clone)]
 pub struct AI {
     pub brain: NeuralNetwork,
-    pub good: bool,
+    pub old_mutation: bool,
 }
 
 impl AI {
@@ -28,7 +28,7 @@ impl AI {
 
         Self {
             brain,
-            good: false,
+            old_mutation: false,
         }
     }
 
@@ -36,7 +36,7 @@ impl AI {
             // create a function that mutates the weights and biases slightly
 
         let mut apply_mutation = |x: f32| -> f32 {
-            x + ((rand::random::<f32>() - 0.5) * 2.0).powi(2) * x * learn_rate
+            x + ((rand::random::<f32>() - 0.5) * 2.0).powi(4) * x * learn_rate
         };
 
         let mut layers = Vec::new();
@@ -48,7 +48,7 @@ impl AI {
 
         Self {
             brain: NeuralNetwork{layers},
-            good: false, 
+            old_mutation: false, 
         }
     }
 }

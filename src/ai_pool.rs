@@ -9,62 +9,19 @@ pub struct Pool{
     ai: Vec<AI>,
 }
 
+pub struct JudgeInfo{
+    pub non_mutated_survivors: u32,
+    pub reached_target: Vec<AI>,
+}
+
 impl Pool{
-    pub fn new(population: u32) -> Self{
-        let mut ai = Vec::new();
-        for _ in 0..population{
-            ai.push(AI::new());
-        }
-
-        Self{
-            ai,
-        }
-    }
-
-    pub fn update_pool(&mut self, good_ai: Vec<AI>){
-        if good_ai.len() == 0{
-            return;
-        }
-
-        self.ai.clear();
-
-
-        let good_ai_to_spawn = num_good_ai_to_spawn(
-            good_ai.len() as u32,
-             0.5
-        );
-
-
-
-        let bad_ai_to_spawn = NUM_AI - good_ai_to_spawn;
-
-        dbg!(good_ai_to_spawn, bad_ai_to_spawn);
-
-        let mut rng = thread_rng();
-
-        for _ in 0..good_ai_to_spawn{
-            let mut new_ai = good_ai.choose(&mut rng).unwrap().clone();
-            self.ai.push(new_ai);
-        }
-
-        //TODO figure out if this has an impact 
-        let learn_multiple = 1.0 - (2.0 * good_ai.len() as f32 / NUM_AI as f32);
-        for _ in 0..bad_ai_to_spawn{
-            let mut new_ai = good_ai.choose(&mut rng).unwrap().learn_reproduce(LEARN_RATE * learn_multiple);
-            new_ai.good = false;
-            self.ai.push(new_ai);
-        }
-
-        self.ai.shuffle(&mut rng);
-    }
-
     pub fn judge_ai(
         &mut self,
         ai_query: &Query<(Entity,&Transform, &AI)>,
         target_query: &Query<&Target>,
-    ) -> u32 {
-        let mut good_ai = Vec::new();
-        let mut num_survived = 0;
+    ) -> JudgeInfo {
+        let mut reached_target = Vec::new();
+        let mut non_mutated_surviors = 0;
 
         for (_, transform, ai) in ai_query.iter() {
             let in_target = target_query.iter().any(|target| {
@@ -73,38 +30,69 @@ impl Pool{
                 target.is_in_target(pos)
             });
 
-            let mut i = ai.clone();
             if in_target {
-                if i.good == true{
-                    num_survived += 1;
-                } else {
-                    i.good = true;
+                if ai.old_mutation{
+                    non_mutated_surviors += 1;
                 }
-
-                good_ai.push(i);
-            } else {
-                i.good = false;
-            }
+                let mut i = ai.clone();
+                i.old_mutation = true;
+                reached_target.push(i);
+            } 
         }
 
-        self.update_pool(good_ai);
-        num_survived
+        JudgeInfo{
+            non_mutated_survivors: non_mutated_surviors,
+            reached_target,
+        }
     }
 
-    fn create_new_ai(&self) -> AI{
-        let mut rng = thread_rng();
-        let ai = self.ai.choose(&mut rng).unwrap();
+    pub fn update_pool(&mut self, info: JudgeInfo){
+        let r_target = info.reached_target;
+        if r_target.len() == 0{
+            return;
+        }
 
-        ai.clone()
+        self.ai.clear();
+
+
+        let old_ai_to_spawn = num_good_ai_to_spawn(
+            r_target.len() as u32,
+             0.5
+        );
+
+        let mutated_ai_to_spawn;
+        if info.non_mutated_survivors as f32 > NUM_AI as f32 / 2.1{
+            mutated_ai_to_spawn = 0;
+        } else {
+            mutated_ai_to_spawn = NUM_AI - old_ai_to_spawn;
+        }
+        
+        dbg!(old_ai_to_spawn, mutated_ai_to_spawn);
+
+        let mut rng = thread_rng();
+
+        for _ in 0..old_ai_to_spawn{
+            let new_ai = r_target.choose(&mut rng).unwrap().clone();
+            self.ai.push(new_ai);
+        }
+
+
+        //TODO figure out if this has an impact 
+        // let learn_multiple = 1.0 - (2.0 * good_ai.len() as f32 / NUM_AI as f32);
+        for _ in 0..mutated_ai_to_spawn{
+            let new_ai = r_target.choose(&mut rng).unwrap().learn_reproduce(LEARN_RATE);
+            self.ai.push(new_ai);
+        }
+
+        self.ai.shuffle(&mut rng);
     }
 
     pub fn spawn_ai(&self, commands: &mut Commands) {
-        let mut spawn = |x: f32, y: f32| {
-            let ai = self.create_new_ai();
+        let mut spawn = |ai: &AI, x: f32, y: f32| {
             let color;
             let z_layer;
             
-            match ai.good{
+            match ai.old_mutation{
                 true => {
                     color = Color::BLUE;
                     z_layer = 501.0;
@@ -118,7 +106,7 @@ impl Pool{
                 .spawn_bundle(SpriteBundle {
                     sprite: Sprite {
                         custom_size: Some(Vec2::new(1.0, 1.0)),
-                        color: color,
+                        color,
                         ..Default::default()
                     },
                     transform: Transform {
@@ -128,31 +116,34 @@ impl Pool{
                     },
                     ..Default::default()
                 })
-                .insert(ai);
+                .insert(ai.clone());
         };
     
         let mut rng = rand::thread_rng();
-        for _ in 0..NUM_AI {
+        for ai in self.ai.iter() {
             let x = rng.gen_range(-SPAWN_RADII..SPAWN_RADII);
             let y = rng.gen_range(-SPAWN_RADII..SPAWN_RADII);
-            spawn(x, y);
+            spawn(ai, x, y);
+        }
+    }
+
+    pub fn new(population: u32) -> Self{
+        let mut ai = Vec::new();
+        for _ in 0..population{
+            ai.push(AI::new());
+        }
+
+        Self{
+            ai,
         }
     }
 }
 
 fn num_good_ai_to_spawn(good_ai_num: u32, growth_rate: f32) -> u32 {
-    let t = NUM_AI as f32;
-    let g = good_ai_num as f32;
-    (2.0 * t - (2.0 * t) / (1.0 + (g / t).powf(growth_rate))) as u32
-
-    // if good_ai_num == 0{
-    //     0
-    // } 
-    // // else if good_ai_num < (NUM_AI as f32 / 2.0) as u32 {
-    // //     NUM_AI / 2
-    // // } 
-    // else {
-    //     NUM_AI / 2
-    // }
+    // let t = NUM_AI as f32;
+    // let g = good_ai_num as f32;
+    // (2.0 * t - (2.0 * t) / (1.0 + (g / t).powf(growth_rate))) as u32
+    
+    NUM_AI/ 2
 }
 

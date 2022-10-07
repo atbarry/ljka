@@ -23,3 +23,4 @@ Notice how much faster this generation of ai learned. Additionally the target he
 ![spiral](media/super_nice_spiral.gif)  
 Note: This the program found by complete chance on the first generation, I didn't even know it was possible to get this result.
 
+![diamond](media/crazy_rotating_diamond.gif)

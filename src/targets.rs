@@ -12,9 +12,9 @@ fn spawn_target(
     mut commands: Commands,
 ) {
     // spawn a square off to the right
-    let x = 50.0;
-    let y = 50.0;
-    let radius = 5.0;
+    let x = 40.0;
+    let y = 40.0;
+    let radius = 2.0;
     let target = Target::new(Shape::Square, Vec2 { x, y }, radius);
 
     let sprite_bundle = target.create_sprite_bundle();
@@ -22,11 +22,11 @@ fn spawn_target(
         .insert(target)
         .insert(Name::new("TargetSquare"));
 
-    let target = Target::new(Shape::Square, Vec2 { x: -x, y }, radius);
-    let sprite_bundle = target.create_sprite_bundle();
-    commands.spawn_bundle(sprite_bundle)
-        .insert(target)
-        .insert(Name::new("TargetSquare"));
+    // let target = Target::new(Shape::Square, Vec2 { x: -x, y }, radius);
+    // let sprite_bundle = target.create_sprite_bundle();
+    // commands.spawn_bundle(sprite_bundle)
+    //     .insert(target)
+    //     .insert(Name::new("TargetSquare"));
 }
 
 

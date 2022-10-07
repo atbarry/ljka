@@ -1,12 +1,13 @@
-use rand::{thread_rng, seq::SliceRandom, Rng};
+use rand::{thread_rng, seq::SliceRandom, Rng, rngs::ThreadRng};
 use bevy::{prelude::*, render::color};
 
-use crate::{ai_logic::AI, targets::Target, AI_SPRITE_SCALE, SPAWN_RADII, NUM_AI, LEARN_RATE};
+use crate::{ai_logic::AI, targets::Target, AI_SPRITE_SCALE, SPAWN_RADII, NUM_AI, LEARN_RATE, STOP_MUTATE_THRESHOLD};
 
 
 
 pub struct Pool{
     ai: Vec<AI>,
+    id: u64,
 }
 
 pub struct JudgeInfo{
@@ -30,15 +31,20 @@ impl Pool{
                 target.is_in_target(pos)
             });
 
-            if in_target {
-                if ai.old_mutation{
-                    non_mutated_surviors += 1;
-                }
-                let mut i = ai.clone();
-                i.old_mutation = true;
-                reached_target.push(i);
+            if !in_target {
+                continue;
             } 
+
+            if !ai.new_mutation{
+                non_mutated_surviors += 1;
+            }
+
+            let mut i = ai.clone();
+            i.new_mutation = false;
+            reached_target.push(i);
         }
+
+        dbg!(self.id);
 
         JudgeInfo{
             non_mutated_survivors: non_mutated_surviors,
@@ -48,42 +54,46 @@ impl Pool{
 
     pub fn update_pool(&mut self, info: JudgeInfo){
         let r_target = info.reached_target;
+        let nm_surv = info.non_mutated_survivors;
+
         if r_target.len() == 0{
             return;
         }
 
         self.ai.clear();
-
-
-        let old_ai_to_spawn = num_good_ai_to_spawn(
-            r_target.len() as u32,
-             0.5
-        );
-
-        let mutated_ai_to_spawn;
-        if info.non_mutated_survivors as f32 > NUM_AI as f32 / 2.1{
-            mutated_ai_to_spawn = 0;
-        } else {
-            mutated_ai_to_spawn = NUM_AI - old_ai_to_spawn;
-        }
-        
-        dbg!(old_ai_to_spawn, mutated_ai_to_spawn);
-
         let mut rng = thread_rng();
 
-        for _ in 0..old_ai_to_spawn{
-            let new_ai = r_target.choose(&mut rng).unwrap().clone();
+        let get_old_ai = |rng:&mut ThreadRng| {
+            r_target.choose(rng).unwrap().clone() 
+        };
+        let mutated_old_ai = |rng:&mut ThreadRng, id: u64| {
+            r_target.choose(rng).unwrap().clone().learn_reproduce(LEARN_RATE, id)
+        };
+        let get_new_ai = |_rng:&mut ThreadRng, id: u64| {
+            AI::new(id)
+        };
+
+        for _ in 0..NUM_AI{
+            let old_ai = get_old_ai(&mut rng);
+            self.ai.push(old_ai);
+        }
+
+        let threshold = nm_surv as f32 / NUM_AI as f32;
+        let mutated_to_spawn = if threshold > STOP_MUTATE_THRESHOLD{0} else {NUM_AI - nm_surv};
+        let mut mutated_target: Box<dyn FnMut(&mut ThreadRng, u64) -> AI>;
+
+        if nm_surv < 50 {
+            mutated_target = Box::new(get_new_ai);
+        } else {
+            mutated_target = Box::new(mutated_old_ai);
+        }
+
+        for _ in 0..mutated_to_spawn{
+            let new_ai = mutated_target(&mut rng, self.next_id());
             self.ai.push(new_ai);
         }
 
-
-        //TODO figure out if this has an impact 
-        // let learn_multiple = 1.0 - (2.0 * good_ai.len() as f32 / NUM_AI as f32);
-        for _ in 0..mutated_ai_to_spawn{
-            let new_ai = r_target.choose(&mut rng).unwrap().learn_reproduce(LEARN_RATE);
-            self.ai.push(new_ai);
-        }
-
+        // shuffle the pool
         self.ai.shuffle(&mut rng);
     }
 
@@ -92,12 +102,12 @@ impl Pool{
             let color;
             let z_layer;
             
-            match ai.old_mutation{
-                true => {
+            match ai.new_mutation{
+                false => {
                     color = Color::BLUE;
                     z_layer = 501.0;
                 },
-                false => {
+                true => {
                     color = Color::RED;
                     z_layer = 500.0;
                 }
@@ -128,22 +138,20 @@ impl Pool{
     }
 
     pub fn new(population: u32) -> Self{
-        let mut ai = Vec::new();
+        let mut pool = Self{ ai: Vec::new(), id: 0};
+
         for _ in 0..population{
-            ai.push(AI::new());
+            let ai = AI::new(pool.next_id());
+            pool.ai.push(ai);
         }
 
-        Self{
-            ai,
-        }
+        pool
+    }
+
+    fn next_id(&mut self) -> u64{
+        self.id += 1;
+        self.id
     }
 }
 
-fn num_good_ai_to_spawn(good_ai_num: u32, growth_rate: f32) -> u32 {
-    // let t = NUM_AI as f32;
-    // let g = good_ai_num as f32;
-    // (2.0 * t - (2.0 * t) / (1.0 + (g / t).powf(growth_rate))) as u32
-    
-    NUM_AI/ 2
-}
 
